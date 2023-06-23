@@ -2,7 +2,6 @@ package com.toszek.hackerrank.challange.strings;
 
 import static org.assertj.core.api.Assertions.*;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -14,7 +13,7 @@ class FunnyStringsTest {
 
     @Test
     void funnyStringIsFunny() {
-        Assertions.assertThat(FunnyStrings.funnyString("acxz")).isEqualTo("Funny");
+        assertThat(FunnyStrings.funnyString("acxz")).isEqualTo("Funny");
     }
 
     @Test
