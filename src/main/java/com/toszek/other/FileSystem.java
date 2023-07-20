@@ -5,26 +5,29 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
- * - dodawanie plikow
- * Plik:
- * nazwa, rozmiar, kolekcja/tag (na potrzeby grupowania)
+ * Requirements
+ * - adding files to the filesystem
+ * file:
+ * name, size, tag
  * <p>
  * Constrains:
- * 1 tag na plik max
+ * 1 tag per file max
  * <p>
- * Zadanie:
- * - dodawanie plikow
+ * additional functionality:
+ * - report of total file sizes
+ * - report n biggest tags in regards of total file sizes of tagged files
  * <p>
- * wygenerowac raport:
- * - suma wszyskich rozmiarow plikow
- * - n najwiekszych kolekcji, zwraca liste nazw tagow
+ * change of requirements:
+ * file can have more then one tag attached to it
  */
 
-record File(String name, long size, String tag) {
+record File(String name, long size, Set<String> tag) {
 }
 
 class TagSizeCounter implements Comparable<TagSizeCounter> {
@@ -46,7 +49,7 @@ class TagSizeCounter implements Comparable<TagSizeCounter> {
 
     @Override
     public int compareTo(final TagSizeCounter o) {
-        return Long.compare((int) size, (int) o.size);
+        return -1 * Long.compare((int) size, (int) o.size);
     }
 
     public void addSize(final long size) {
@@ -73,19 +76,21 @@ class FileSystem {
     private final Map<String, TagSizeCounter> tagsInSystem = new HashMap<>();
     private long sizeCounter = 0;
 
-    public void addFile(String name, long size, String tag) {
+    public void addFile(String name, long size, Set<String> tags) {
         if (size <= 0) {
             throw new RuntimeException("Size cannot be below");
         }
-        files.add(new File(name, size, tag));
+        tags = tags != null ? tags.stream().filter(tag -> tag != null && !tag.isBlank()).collect(Collectors.toSet()) : null;
+
+        files.add(new File(name, size, tags));
         sizeCounter += size;
-        if (tag != null && !tag.isBlank()) {
-            final TagSizeCounter tagSizeCounter = tagsInSystem.computeIfAbsent(tag, tag1 -> {
-                final TagSizeCounter counter = new TagSizeCounter(tag1);
-                tagsStatisticsSet.add(counter);
-                return counter;
+        if (tags != null) {
+            tags.forEach(tag -> {
+                final TagSizeCounter tagSizeCounter = tagsInSystem.computeIfAbsent(tag, TagSizeCounter::new);
+                tagsStatisticsSet.remove(tagSizeCounter);
+                tagSizeCounter.addSize(size);
+                tagsStatisticsSet.add(tagSizeCounter);
             });
-            tagSizeCounter.addSize(size);
         }
     }
 
