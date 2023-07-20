@@ -30,14 +30,17 @@ class RateLimiterTest {
 
     @Test
     void rateLimitsOneUserAllowsSecond() {
-        RateLimiter rateLimiter = new RateLimiter(1, 5000, newCreditsForClient);
+        RateLimiter rateLimiter = new RateLimiter(1, 5000, 1);
         assertThatNoException().isThrownBy(() -> {
-            rateLimiter.rateLimit(1);
-            assertThat(rateLimiter.rateLimit(1))
-                    .isFalse();
-
+            // normal
             assertThat(rateLimiter.rateLimit(2))
                     .isTrue();
+            // on credit
+            assertThat(rateLimiter.rateLimit(2))
+                    .isTrue();
+            // end of credit
+            assertThat(rateLimiter.rateLimit(2))
+                    .isFalse();
         });
     }
 }

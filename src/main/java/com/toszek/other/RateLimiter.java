@@ -1,6 +1,7 @@
 package com.toszek.other;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,22 +19,30 @@ import java.util.concurrent.ConcurrentHashMap;
  * boolean rateLimit(int customerId)
  * constaints:
  * up to 10k users
+ *
+ * Change request:
+ * add credits for each customer to allow burst functionality, credits are replenished each hour.
  */
 
 
-record CreditInfo(Instant creation, int credits) {
-}
-
-final class CustomerInfo {
-    private final List<Instant> calls;
+final class CreditInfo {
+    private final Instant creation;
     private int credits;
 
     /**
      *
      */
-    CustomerInfo(List<Instant> calls, CreditInfo credits) {
-        this.calls = calls;
+    public CreditInfo(Instant creation, int credits) {
+        this.creation = creation;
         this.credits = credits;
+    }
+
+    public Instant creation() {
+        return creation;
+    }
+
+    public int getCredits() {
+        return credits;
     }
 
     public void decreaseCredits() {
@@ -43,12 +52,56 @@ final class CustomerInfo {
         }
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        var that = (CreditInfo) obj;
+        return Objects.equals(this.creation, that.creation) &&
+                this.credits == that.credits;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(creation, credits);
+    }
+
+    @Override
+    public String toString() {
+        return "CreditInfo[" +
+                "creation=" + creation + ", " +
+                "credits=" + credits + ']';
+    }
+
+}
+
+final class CustomerInfo {
+    private final List<Instant> calls;
+    private CreditInfo credits;
+    private final int newCreditsPool;
+
+    /**
+     *
+     */
+    CustomerInfo(List<Instant> calls, CreditInfo credits, int newCreditsPool) {
+        this.calls = calls;
+        this.credits = credits;
+        this.newCreditsPool = newCreditsPool;
+    }
+
+    public void decreaseCredits() {
+        if (credits.creation().truncatedTo(ChronoUnit.HOURS).isBefore(Instant.now().truncatedTo(ChronoUnit.HOURS))) {
+            credits = new CreditInfo(Instant.now(), newCreditsPool);
+        }
+        credits.decreaseCredits();
+    }
+
     public List<Instant> calls() {
         return calls;
     }
 
     public int credits() {
-        return credits;
+        return credits.getCredits();
     }
 
     @Override
@@ -89,7 +142,7 @@ public class RateLimiter {
     public boolean rateLimit(int customerId) {
         Instant now = Instant.now();
         Instant removeThreshold = now.minusMillis(timeIntervalInMilliseconds);
-        final CustomerInfo customerInfo = rateLimiterMap.computeIfAbsent(customerId, key -> new CustomerInfo(new ArrayList<>(), newCreditsForClient));
+        final CustomerInfo customerInfo = rateLimiterMap.computeIfAbsent(customerId, key -> new CustomerInfo(new ArrayList<>(), new CreditInfo(Instant.now(), newCreditsForClient), newCreditsForClient));
 
         // clean old requests
         // there is a better approach to do it manually and stop on not before element
@@ -100,11 +153,11 @@ public class RateLimiter {
         // access allow decision
         final boolean decision = customerInfo.calls().size() <= allowedRequestsCount;
         if (!decision) {
-            if (customerInfo.credits() > 0) {
+            try {
                 customerInfo.decreaseCredits();
-                return true;
+            } catch (Exception e) {
+                return false;
             }
-            return false;
         }
         return true;
     }
