@@ -34,4 +34,16 @@ class FileSystemTest {
         assertThat(fileSystem.getFirstBiggestTags(3))
                 .containsExactly("c", "b", "a");
     }
+
+    @Test
+    void getFirstBiggestTagsOverLimit() {
+        FileSystem fileSystem = new FileSystem();
+        fileSystem.addFile("test", 10, "a");
+        fileSystem.addFile("test4", 30, null);
+        fileSystem.addFile("test3", 30, "c");
+        fileSystem.addFile("test2", 20, "b");
+
+        assertThat(fileSystem.getFirstBiggestTags(5))
+                .containsExactly("c", "b", "a");
+    }
 }

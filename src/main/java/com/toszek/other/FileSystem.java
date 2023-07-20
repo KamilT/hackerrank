@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * - dodawanie plikow
@@ -24,7 +26,7 @@ import java.util.TreeSet;
  * - n najwiekszych kolekcji, zwraca liste nazw tagow
  */
 
-record File(String name, long size, String tag) {
+record File(String name, long size, Set<String> tag) {
 }
 
 class TagSizeCounter implements Comparable<TagSizeCounter> {
@@ -46,7 +48,7 @@ class TagSizeCounter implements Comparable<TagSizeCounter> {
 
     @Override
     public int compareTo(final TagSizeCounter o) {
-        return Long.compare((int) size, (int) o.size);
+        return -1 * Long.compare((int) size, (int) o.size);
     }
 
     public void addSize(final long size) {
@@ -73,20 +75,20 @@ class FileSystem {
     private final Map<String, TagSizeCounter> tagsInSystem = new HashMap<>();
     private long sizeCounter = 0;
 
-    public void addFile(String name, long size, String tag) {
+    public void addFile(String name, long size, Set<String> tags) {
         if (size <= 0) {
             throw new RuntimeException("Size cannot be below");
         }
-        files.add(new File(name, size, tag));
+        tags = tags.stream().filter(tag -> tag != null && !tag.isBlank()).collect(Collectors.toSet());
+
+        files.add(new File(name, size, tags));
         sizeCounter += size;
-        if (tag != null && !tag.isBlank()) {
-            final TagSizeCounter tagSizeCounter = tagsInSystem.computeIfAbsent(tag, tag1 -> {
-                final TagSizeCounter counter = new TagSizeCounter(tag1);
-                tagsStatisticsSet.add(counter);
-                return counter;
-            });
+        tags.forEach(tag -> {
+            final TagSizeCounter tagSizeCounter = tagsInSystem.computeIfAbsent(tag, TagSizeCounter::new);
+            tagsStatisticsSet.remove(tagSizeCounter);
             tagSizeCounter.addSize(size);
-        }
+            tagsStatisticsSet.add(tagSizeCounter);
+        });
     }
 
     public long getTotalSizeOfFilesInSystem() {
