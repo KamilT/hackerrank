@@ -11,19 +11,20 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * - dodawanie plikow
- * Plik:
- * nazwa, rozmiar, kolekcja/tag (na potrzeby grupowania)
+ * Requirements
+ * - adding files to the filesystem
+ * file:
+ * name, size, tag
  * <p>
  * Constrains:
- * 1 tag na plik max
+ * 1 tag per file max
  * <p>
- * Zadanie:
- * - dodawanie plikow
+ * additional functionality:
+ * - report of total file sizes
+ * - report n biggest tags in regards of total file sizes of tagged files
  * <p>
- * wygenerowac raport:
- * - suma wszyskich rozmiarow plikow
- * - n najwiekszych kolekcji, zwraca liste nazw tagow
+ * change of requirements:
+ * file can have more then one tag attached to it
  */
 
 record File(String name, long size, Set<String> tag) {
@@ -79,16 +80,18 @@ class FileSystem {
         if (size <= 0) {
             throw new RuntimeException("Size cannot be below");
         }
-        tags = tags.stream().filter(tag -> tag != null && !tag.isBlank()).collect(Collectors.toSet());
+        tags = tags != null ? tags.stream().filter(tag -> tag != null && !tag.isBlank()).collect(Collectors.toSet()) : null;
 
         files.add(new File(name, size, tags));
         sizeCounter += size;
-        tags.forEach(tag -> {
-            final TagSizeCounter tagSizeCounter = tagsInSystem.computeIfAbsent(tag, TagSizeCounter::new);
-            tagsStatisticsSet.remove(tagSizeCounter);
-            tagSizeCounter.addSize(size);
-            tagsStatisticsSet.add(tagSizeCounter);
-        });
+        if (tags != null) {
+            tags.forEach(tag -> {
+                final TagSizeCounter tagSizeCounter = tagsInSystem.computeIfAbsent(tag, TagSizeCounter::new);
+                tagsStatisticsSet.remove(tagSizeCounter);
+                tagSizeCounter.addSize(size);
+                tagsStatisticsSet.add(tagSizeCounter);
+            });
+        }
     }
 
     public long getTotalSizeOfFilesInSystem() {
