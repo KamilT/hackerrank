@@ -2,13 +2,12 @@ package com.toszek.other;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedList;
 
 class RateLimiterLeakingBucketImpl implements RateLimiterLeakingBucket {
     private final int maxCapacity;
     private final int drainRequestPerMilliseconds;
-
-    private final LinkedList<Instant> requestsQueue = new LinkedList<>();
+    private long bucket;
+    private Instant lastCallTimestamp;
 
     public RateLimiterLeakingBucketImpl(final int maxCapacity, final int drainRequestPerMillisecond) {
         this.maxCapacity = maxCapacity;
@@ -21,23 +20,20 @@ class RateLimiterLeakingBucketImpl implements RateLimiterLeakingBucket {
     }
 
     synchronized boolean shouldConsumeRequest(Instant now) {
-        // clean capacity of my queue
-        // take oldest from queue
-        // calculate how many to delete based on elapsed time and drainRequestPerSecond
-        // remove till countToDelete reached or queue is empty
-
-        if (!requestsQueue.isEmpty()) {
-            final Instant last = requestsQueue.getLast();
-            long countToDelete = Duration.between(last, now).toMillis() * drainRequestPerMilliseconds;
-
-            while (!requestsQueue.isEmpty() && countToDelete > 0) {
-                requestsQueue.removeLast();
-                countToDelete--;
+        if (lastCallTimestamp != null) {
+            long countToDelete = Duration.between(lastCallTimestamp, now).toMillis() * drainRequestPerMilliseconds;
+            lastCallTimestamp = now;
+            bucket -= countToDelete;
+            if (bucket < 0) {
+                bucket = 0;
             }
+        } else {
+            lastCallTimestamp = now;
+            bucket = 0;
         }
 
-        if (requestsQueue.size() < maxCapacity) {
-            requestsQueue.add(now);
+        if (bucket < maxCapacity) {
+            bucket += 1;
             return true;
         }
         return false;
